@@ -1064,7 +1064,7 @@ class PropertySpec: QuickSpec {
 							.producer
 							.startWithValues { value in
 								if !receivedInitialValue {
-									receivedInitialValue = Thread.current.isMainThread
+									receivedInitialValue = Thread.isMainThread
 								} else {
 									counter += DispatchQueue.getSpecific(key: specific) != nil ? 1 : 0
 									semaphore.signal()
