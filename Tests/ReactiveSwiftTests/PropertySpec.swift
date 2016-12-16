@@ -1046,6 +1046,49 @@ class PropertySpec: QuickSpec {
 					property = MutableProperty(initialPropertyValue)
 				}
 
+				describe("observe(on:)") {
+					it("should emit subsequent values on the given scheduler") {
+						let queue = DispatchQueue(label: "PropertySpecTest")
+						let specific = DispatchSpecificKey<()>()
+						queue.setSpecific(key: specific, value: ())
+						let scheduler = QueueScheduler(queue: queue)
+
+						var receivedInitialValue = false
+						var values: [String] = []
+						var counter = 0
+
+						let semaphore = DispatchSemaphore(value: 0)
+
+						property
+							.observe(on: scheduler)
+							.producer
+							.startWithValues { value in
+								if !receivedInitialValue {
+									receivedInitialValue = Thread.current.isMainThread
+								} else {
+									counter += DispatchQueue.getSpecific(key: specific) != nil ? 1 : 0
+									semaphore.signal()
+								}
+
+								values.append(value)
+							}
+
+						expect(receivedInitialValue) == true
+						expect(values) == [initialPropertyValue]
+						expect(counter) == 0
+
+						property.value = subsequentPropertyValue
+						semaphore.wait()
+						expect(values) == [initialPropertyValue, subsequentPropertyValue]
+						expect(counter) == 1
+
+						property.value = finalPropertyValue
+						semaphore.wait()
+						expect(values) == [initialPropertyValue, subsequentPropertyValue, finalPropertyValue]
+						expect(counter) == 2
+					}
+				}
+
 				describe("combinePrevious") {
 					it("should pack the current value and the previous value a tuple") {
 						let transformedProperty = property.combinePrevious(initialPropertyValue)

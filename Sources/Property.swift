@@ -76,6 +76,34 @@ extension PropertyProtocol {
 		return lift { $0.map(transform) }
 	}
 
+	/// Create a property which forwards all subsequent changes and the terminal
+	/// event onto the given scheduler, instead of whichever scheduler they
+	/// originally arrived upon.
+	///
+	/// - parameters:
+	///   - scheduler: A scheduler to deliver events on.
+	///
+	/// - returns: A property that yield subsequent values and `completed` on
+	///            the provided scheduler.
+	public func observe(on scheduler: SchedulerProtocol) -> Property<Value> {
+		return lift { producer in
+			return SignalProducer { observer, disposable in
+				var hasDeliveredFirst = false
+
+				disposable += producer.start { event in
+					if hasDeliveredFirst {
+						disposable += scheduler.schedule {
+							observer.action(event)
+						}
+					} else {
+						observer.action(event)
+						hasDeliveredFirst = true
+					}
+				}
+			}
+		}
+	}
+
 	/// Combines the current value and the subsequent values of two `Property`s in
 	/// the manner described by `Signal.combineLatestWith:`.
 	///
